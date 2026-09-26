@@ -1,0 +1,186 @@
+:root {
+    --color-bg: #F5F1EA;
+    --color-surface: #FFFFFF;
+    --color-text: #1F1E1D;
+    --color-text-muted: #6A6660;
+    --color-border: #E8E2D6;
+    --color-primary: #D97757;
+    --color-primary-dark: #BD5D3A;
+    --color-primary-soft: #F1E2D5;
+    --font-heading: 'Source Serif 4', Georgia, serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+}
+
+/* NAVBAR */
+.app-navbar {
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: 0.9rem 0;
+}
+.brand-mark {
+    color: var(--color-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.brand-text {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: 1.15rem;
+}
+.nav-link {
+    color: var(--color-text-muted) !important;
+    font-weight: 500;
+}
+.nav-link:hover { color: var(--color-primary) !important; }
+
+/* BOTONES */
+.btn-app-primary {
+    background-color: var(--color-primary);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.6rem 1.3rem;
+    transition: background-color .15s ease;
+}
+.btn-app-primary:hover { background-color: var(--color-primary-dark); color: #fff; }
+
+.btn-app-outline {
+    background: transparent;
+    border: 1.5px solid var(--color-border);
+    color: var(--color-text);
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.6rem 1.3rem;
+}
+.btn-app-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* HERO */
+.hero-section { background-color: var(--color-bg); }
+.badge-soft {
+    display: inline-block;
+    background-color: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+}
+.hero-title {
+    font-family: var(--font-heading);
+    font-size: 2.9rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-top: 0.75rem;
+    color: var(--color-text);
+}
+.hero-subtitle {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    max-width: 40rem;
+    margin-top: 1rem;
+}
+.powered-tag {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+.powered-tag strong { color: var(--color-primary-dark); }
+
+.hero-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 8px 24px rgba(31,30,29,0.06);
+}
+.hero-card-dot {
+    width: 12px; height: 12px;
+    background-color: var(--color-primary);
+    border-radius: 50%;
+    margin-bottom: 1rem;
+}
+.hero-card-line {
+    color: var(--color-text);
+    font-weight: 500;
+    margin-bottom: 0.6rem;
+}
+
+/* SECCIONES */
+.section-title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.feature-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 1.8rem;
+    height: 100%;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(31,30,29,0.08);
+}
+.feature-icon {
+    color: var(--color-primary);
+    font-size: 1.6rem;
+    margin-bottom: 0.75rem;
+}
+.feature-card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+.feature-card p { color: var(--color-text-muted); margin: 0; }
+
+/* ASISTENTE */
+.assistant-panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 2rem;
+}
+.chat-historial {
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.chat-bubble {
+    padding: 0.6rem 1rem;
+    border-radius: 12px;
+    max-width: 80%;
+    font-size: 0.95rem;
+}
+.chat-bubble.user {
+    align-self: flex-end;
+    background-color: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+}
+.chat-bubble.asistente {
+    align-self: flex-start;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+}
+
+/* FOOTER */
+.app-footer {
+    background-color: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+.powered-by i { color: var(--color-primary); }

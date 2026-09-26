@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- HERO -->
+<header class="hero-section">
+    <div class="container py-5">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7">
+                <span class="badge-soft mb-3"><i class="bi bi-stars"></i> Educación potenciada por IA</span>
+                <h1 class="hero-title">Aulas Inteligentes con IA</h1>
+                <p class="hero-subtitle">
+                    Una plataforma para transformar tus aulas en espacios de aprendizaje
+                    adaptativos: asistentes virtuales, seguimiento en tiempo real y
+                    herramientas pedagógicas impulsadas por inteligencia artificial.
+                </p>
+                <div class="d-flex flex-wrap gap-3 mt-4">
+                    <a href="#asistente" class="btn btn-app-primary btn-lg">
+                        <i class="bi bi-chat-dots"></i> Probar el asistente
+                    </a>
+                    <a href="{{ url_for('aulas') }}" class="btn btn-app-outline btn-lg">
+                        Ver aulas
+                    </a>
+                </div>
+                <p class="powered-tag mt-4">
+                    <i class="bi bi-stars"></i> Powered by <strong>Claude</strong>
+                </p>
+            </div>
+            <div class="col-lg-5">
+                <div class="hero-card">
+                    <div class="hero-card-dot"></div>
+                    <p class="hero-card-line">🧠 Asistente activo</p>
+                    <p class="hero-card-line">📊 3 aulas conectadas</p>
+                    <p class="hero-card-line">✅ Reportes generados hoy: 12</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- CARACTERÍSTICAS -->
+<section class="container py-5">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-mortarboard"></i></div>
+                <h3>Aprendizaje adaptativo</h3>
+                <p>Contenido y ejercicios que se ajustan al ritmo de cada estudiante.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-chat-square-text"></i></div>
+                <h3>Asistente docente</h3>
+                <p>Apoyo con Claude para resolver dudas, resumir clases y crear material.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-bar-chart"></i></div>
+                <h3>Panel en tiempo real</h3>
+                <p>Métricas de participación y progreso de cada aula al instante.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if aulas %}
+<!-- LISTADO DE AULAS -->
+<section class="container py-4">
+    <h2 class="section-title mb-4">Aulas registradas</h2>
+    <div class="row g-4">
+        {% for aula in aulas %}
+        <div class="col-md-4">
+            <div class="feature-card">
+                <h3>{{ aula.nombre }}</h3>
+                <p class="mb-1">Estado: <span class="badge-soft">{{ aula.estado }}</span></p>
+                <p class="mb-0">Estudiantes: {{ aula.estudiantes }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<!-- ASISTENTE IA -->
+<section id="asistente" class="container py-5">
+    <div class="assistant-panel">
+        <h2 class="section-title"><i class="bi bi-stars"></i> Asistente de Aula</h2>
+        <p class="text-muted">Escribe una pregunta y el asistente (impulsado por Claude) te responderá.</p>
+
+        <div id="chatHistorial" class="chat-historial mb-3"></div>
+
+        <form id="formAsistente" class="d-flex gap-2">
+            <input type="text" id="mensajeInput" class="form-control"
+                   placeholder="Ej: Explícame la fotosíntesis para 5to grado" required>
+            <button type="submit" class="btn btn-app-primary">
+                <i class="bi bi-send"></i>
+            </button>
+        </form>
+    </div>
+</section>
+
+{% endblock %}
