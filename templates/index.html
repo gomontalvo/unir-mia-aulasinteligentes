@@ -21,9 +21,17 @@
                     <a href="{{ url_for('aulas') }}" class="btn btn-app-outline btn-lg">
                         Ver aulas
                     </a>
+                    <form action="{{ url_for('crear_aula') }}" method="post">
+                        <button type="submit" class="btn btn-app-outline btn-lg">
+                            <i class="bi bi-plus-square"></i> Crear archivo de aulas
+                        </button>
+                    </form>
                 </div>
+                {% if aula_creada %}
+                <p class="text-success mt-3 mb-0" role="status">El archivo aula.dat se creó correctamente.</p>
+                {% endif %}
                 <p class="powered-tag mt-4">
-                    <i class="bi bi-stars"></i> Powered by <strong>Claude</strong>
+                    <i class="bi bi-stars"></i> Created by <strong>Humberto Villaseñor y Omar Montalvo</strong>
                 </p>
             </div>
             <div class="col-lg-5">

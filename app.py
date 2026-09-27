@@ -1,13 +1,24 @@
-from flask import Flask, render_template, jsonify, request
+from pathlib import Path
+
+from flask import Flask, redirect, render_template, jsonify, request, url_for
+import pandas as pd
 from config import Config
+from crea_aula import crear_archivo_dat
 
 # Cliente oficial de Anthropic (se usa únicamente si hay API key configurada)
 try:
     import anthropic
 except ImportError:
     anthropic = None
+    
+DELIMITADOR=";"
+NOMBRE_ARCHIVO = "aula.dat"
 
-
+def cargar_dataframe(nombre_archivo:str):
+    """Carga el archivo .dat en un DataFrame de pandas."""
+    df = pd.read_csv(nombre_archivo, sep=DELIMITADOR, encoding="utf-8")
+    return df
+ 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -21,11 +32,19 @@ def create_app():
             "index.html",
             app_name=app.config["APP_NAME"],
             tagline=app.config["APP_TAGLINE"],
+            aula_creada=request.args.get("aula_creada") == "1",
         )
+
+    @app.route("/crear-aula", methods=["POST"])
+    def crear_aula():
+        crear_archivo_dat(str(Path(app.root_path) / NOMBRE_ARCHIVO))
+        return redirect(url_for("index", aula_creada=1))
 
     @app.route("/aulas")
     def aulas():
         # Placeholder: aquí se listarán las aulas inteligentes registradas
+        df_aula = cargar_dataframe("aulas.dat")
+        
         aulas_demo = [
             {"nombre": "Aula 101 - Matemáticas", "estado": "Activa", "estudiantes": 28},
             {"nombre": "Aula 205 - Ciencias",     "estado": "Activa", "estudiantes": 24},
