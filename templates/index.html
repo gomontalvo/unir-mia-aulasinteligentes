@@ -60,7 +60,7 @@
             <div class="feature-card">
                 <div class="feature-icon"><i class="bi bi-chat-square-text"></i></div>
                 <h3>Asistente docente</h3>
-                <p>Apoyo con Claude para resolver dudas, resumir clases y crear material.</p>
+                <p>Apoyo para resolver dudas, resumir clases y crear material.</p>
             </div>
         </div>
         <div class="col-md-4">
@@ -82,8 +82,8 @@
         <div class="col-md-4">
             <div class="feature-card">
                 <h3>{{ aula.nombre }}</h3>
-                <p class="mb-1">Estado: <span class="badge-soft">{{ aula.estado }}</span></p>
-                <p class="mb-0">Estudiantes: {{ aula.estudiantes }}</p>
+                <p class="mb-1">Ubicacion: <span class="badge-soft">{{ aula.UBICACION }}</span></p>
+                <p class="mb-0">Puestos: {{ aula.CAPACIDAD }}</p>
             </div>
         </div>
         {% endfor %}

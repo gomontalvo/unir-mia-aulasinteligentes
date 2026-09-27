@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Cronograma | {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="schedule-heading">
+    <div class="container py-4">
+        <p class="schedule-eyebrow mb-2">Planificación de espacios</p>
+        <h1 class="section-title mb-1">Cronograma semanal</h1>
+        <p class="text-muted mb-0">Consulta y filtra la disponibilidad de aulas.</p>
+    </div>
+</header>
+
+<main class="container py-4 schedule-page">
+    <section class="schedule-filters" aria-labelledby="buscarTitulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <h2 id="buscarTitulo" class="schedule-section-title mb-0">Buscar</h2>
+            <span class="schedule-period">Datos del {{ fecha_inicio.strftime('%d/%m/%Y') }} al {{ fecha_fin.strftime('%d/%m/%Y') }}</span>
+        </div>
+
+        <form action="{{ url_for('cronograma') }}" method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="mes" class="form-label">Mes</label>
+                <input id="mes" name="mes" type="month" class="form-control"
+                       value="{{ mes }}" min="2026-09" max="2028-12">
+            </div>
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="solicitante" class="form-label">Solicitante</label>
+                <input id="solicitante" name="solicitante" type="search" class="form-control"
+                       value="{{ filtro_solicitante }}" placeholder="Buscar por nombre">
+            </div>
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="aula" class="form-label">Aula</label>
+                <select id="aula" name="aula" class="form-select">
+                    <option value="">Todas las aulas</option>
+                    {% for aula in aulas_disponibles %}
+                    <option value="{{ aula.clave }}" {% if aula.clave == filtro_aula %}selected{% endif %}>
+                        {{ aula.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="ubicacion" class="form-label">Ubicación</label>
+                <select id="ubicacion" name="ubicacion" class="form-select">
+                    <option value="">Todas las ubicaciones</option>
+                    {% for ubicacion in ubicaciones %}
+                    <option value="{{ ubicacion }}" {% if ubicacion == filtro_ubicacion %}selected{% endif %}>
+                        {{ ubicacion }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="hora_inicio" class="form-label">Hora inicial</label>
+                <select id="hora_inicio" name="hora_inicio" class="form-select">
+                    {% for hora in horas_disponibles %}
+                    <option value="{{ hora }}" {% if hora == hora_inicio %}selected{% endif %}>{{ hora }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-2">
+                <label for="hora_fin" class="form-label">Hora final</label>
+                <select id="hora_fin" name="hora_fin" class="form-select">
+                    {% for hora in horas_disponibles %}
+                    <option value="{{ hora }}" {% if hora == hora_fin %}selected{% endif %}>{{ hora }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-app-primary">
+                    <i class="bi bi-search" aria-hidden="true"></i> Buscar
+                </button>
+                <a href="{{ url_for('cronograma') }}" class="btn btn-app-outline">Limpiar filtros</a>
+            </div>
+        </form>
+        {% if horario_invalido %}
+        <p class="text-danger small mt-3 mb-0" role="alert">
+            La hora final debe ser igual o posterior a la hora inicial. Se ajustó al mismo horario inicial.
+        </p>
+        {% endif %}
+    </section>
+
+    {% if not cronograma_disponible %}
+    <div class="alert alert-warning mt-4" role="status">
+        Aún no existe cronograma.dat. Vuelve a Inicio y usa «Crear archivo de aulas» para generarlo.
+    </div>
+    {% endif %}
+
+    <section class="month-section mt-4" aria-labelledby="calendarioTitulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+            <div>
+                <h2 id="calendarioTitulo" class="schedule-section-title mb-1">Elegir día</h2>
+                <p class="text-muted small mb-0">Selecciona un día de lunes a sábado para ver su semana.</p>
+            </div>
+            <p class="month-caption mb-0">{{ mes_nombre }} {{ anio }}</p>
+        </div>
+
+        <div class="month-calendar" role="grid" aria-label="Calendario de {{ mes_nombre }} {{ anio }}">
+            {% for nombre_dia in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] %}
+            <div class="calendar-weekday" role="columnheader">{{ nombre_dia }}</div>
+            {% endfor %}
+            {% for semana in semanas_calendario %}
+                {% for dia in semana %}
+                    {% if dia.month == numero_mes and fecha_inicio <= dia <= fecha_fin %}
+                    <a class="calendar-day {% if dia == fecha_seleccionada %}is-selected{% endif %}"
+                       role="gridcell" aria-label="{{ dia.strftime('%d/%m/%Y') }}"
+                       {% if dia == fecha_seleccionada %}aria-current="date"{% endif %}
+                       href="{{ url_for('cronograma', mes=mes, fecha=dia.isoformat(), solicitante=filtro_solicitante, aula=filtro_aula, ubicacion=filtro_ubicacion, hora_inicio=hora_inicio, hora_fin=hora_fin) }}">
+                        <span>{{ dia.day }}</span>
+                    </a>
+                    {% else %}
+                    <span class="calendar-day is-muted" aria-hidden="true">
+                        {% if dia.month == numero_mes %}{{ dia.day }}{% endif %}
+                    </span>
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="week-section mt-5" aria-labelledby="semanaTitulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+            <div>
+                <h2 id="semanaTitulo" class="schedule-section-title mb-1">Semana seleccionada</h2>
+                <p class="text-muted small mb-0">{{ dias_semana[0].fecha.strftime('%d/%m/%Y') }} – {{ dias_semana[5].fecha.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <div class="schedule-legend" aria-label="Leyenda de disponibilidad">
+                <span><i class="legend-dot is-open"></i> Disponible</span>
+                <span><i class="legend-dot is-reserved"></i> Reservada</span>
+            </div>
+        </div>
+
+        <div class="week-grid-scroll">
+            <table class="week-grid">
+                <thead>
+                    <tr>
+                        <th class="time-column" scope="col">Hora</th>
+                        {% for dia in dias_semana %}
+                        <th scope="col" class="{% if not dia.en_periodo %}is-outside-range{% endif %}">
+                            <span>{{ dia.nombre }}</span>
+                            <strong>{{ dia.fecha.strftime('%d/%m') }}</strong>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in filas_cronograma %}
+                    <tr>
+                        <th class="time-column" scope="row">{{ fila.hora }}</th>
+                        {% for celda in fila.dias %}
+                        <td class="{% if not celda.en_periodo %}is-outside-range{% endif %}">
+                            {% if not celda.en_periodo %}
+                            <span class="empty-slot">Fuera del período</span>
+                            {% elif celda.entradas %}
+                                {% for entrada in celda.entradas %}
+                                <div class="schedule-entry {% if entrada.solicitante %}is-reserved{% else %}is-open{% endif %}">
+                                    <strong>Aula {{ entrada.aula }} · {{ entrada.seccion }}</strong>
+                                    {% if entrada.solicitante %}
+                                    <span>{{ entrada.solicitante }}</span>
+                                    {% if entrada.contacto %}<small>{{ entrada.contacto }}</small>{% endif %}
+                                    {% else %}
+                                    <span>Disponible</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                            <span class="empty-slot">Sin registros</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}
