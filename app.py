@@ -2,11 +2,13 @@ import calendar
 import csv
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from threading import Lock
 
 from flask import Flask, redirect, render_template, jsonify, request, url_for
 import pandas as pd
 from config import Config
 from crea_aula import crear_archivo_dat
+from reserva import buscar_reservas, guardar_reserva
 
 # Cliente oficial de Anthropic (se usa únicamente si hay API key configurada)
 try:
@@ -27,6 +29,7 @@ def cargar_dataframe(nombre_archivo:str):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    candado_reservas = Lock()
 
     # ------------------------------------------------------------------
     # Rutas de páginas
@@ -63,6 +66,119 @@ def create_app():
                                 app_name=app.config["APP_NAME"],
                                 tagline=app.config["APP_TAGLINE"],
                                 aulas=lista_aulas)
+
+    @app.route("/reserva", methods=["GET", "POST"])
+    def reserva_page():
+        manana = max(date.today(), FECHA_INICIO_CRONOGRAMA)
+        while manana.weekday() == 6:
+            manana += timedelta(days=1)
+        if manana > FECHA_FIN_CRONOGRAMA:
+            manana = FECHA_FIN_CRONOGRAMA
+        valores = {
+            "fecha_inicio": request.form.get("fecha_inicio", manana.isoformat()),
+            "fecha_fin": request.form.get("fecha_fin", manana.isoformat()),
+            "horario": request.form.get("horario", "07:00"),
+            "horario_fin": request.form.get("horario_fin", "07:30"),
+            "alumnos": request.form.get("alumnos", ""),
+            "solicitante": request.form.get("solicitante", "").strip(),
+            "descripcion": request.form.get("descripcion", "").strip(),
+            "contacto": request.form.get("contacto", "").strip(),
+        }
+        nombres_dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+        dias_seleccionados = request.form.getlist("dias_semana")
+        if request.method == "GET":
+            dias_seleccionados = [str(manana.weekday())]
+        dias_seleccionados = [dia for dia in dias_seleccionados if dia in {str(i) for i in range(6)}]
+        horas_reserva = [
+            f"{minutos // 60:02d}:{minutos % 60:02d}"
+            for minutos in range(7 * 60, 21 * 60 + 31, 30)
+        ]
+        resultado = None
+        error = None
+        aviso = None
+        reservada = request.args.get("reservada") == "1"
+
+        def clave_opcion(opcion):
+            return (
+                f"{opcion['aula']}|{','.join(opcion['secciones'])}|"
+                f"{opcion['horario']}|{opcion['horario_fin']}"
+            )
+
+        def buscar_opciones():
+            return buscar_reservas(
+                valores["fecha_inicio"],
+                valores["fecha_fin"],
+                valores["horario"],
+                valores["horario_fin"],
+                dias_seleccionados,
+                valores["alumnos"],
+                Path(app.root_path) / NOMBRE_ARCHIVO,
+                Path(app.root_path) / "cronograma.dat",
+            )
+
+        if request.method == "POST":
+            accion = request.form.get("accion")
+            if not valores["solicitante"] or not valores["descripcion"]:
+                error = "Solicitante y descripción son obligatorios."
+            elif not valores["alumnos"]:
+                error = "Ingresa el número de alumnos para comprobar la capacidad."
+            elif not dias_seleccionados:
+                error = "Selecciona al menos un día de lunes a sábado."
+            else:
+                try:
+                    resultado = buscar_opciones()
+                    if accion == "realizar":
+                        seleccion = request.form.get("opcion", "")
+                        with candado_reservas:
+                            resultado = buscar_opciones()
+                            opcion = next(
+                                (item for item in resultado["opciones"] if clave_opcion(item) == seleccion),
+                                None,
+                            )
+                            if opcion is None:
+                                error = "La opción seleccionada ya no está disponible. Revisa las opciones actualizadas."
+                            else:
+                                guardar_reserva(
+                                    opcion,
+                                    resultado["fechas"],
+                                    valores["solicitante"],
+                                    valores["descripcion"],
+                                    valores["contacto"],
+                                    Path(app.root_path) / "cronograma.dat",
+                                )
+                                return redirect(url_for("reserva_page", reservada=1))
+                    elif accion != "buscar":
+                        error = "Acción de reserva no válida."
+                except (ValueError, OSError) as exc:
+                    error = str(exc) or "No se pudo consultar el cronograma."
+
+                if resultado and not resultado["opciones"] and error is None:
+                    if resultado["motivo"] == "capacidad":
+                        error = (
+                            f"No hay un aula con capacidad para {valores['alumnos']} alumnos. "
+                            f"La capacidad máxima por aula, sumando sus secciones, es "
+                            f"{resultado['capacidad_maxima']} alumnos."
+                        )
+                    else:
+                        error = "No hay aulas disponibles para esas fechas, días y horario."
+                elif resultado and resultado["motivo"] == "horario_alternativo":
+                    aviso = "No hay espacio en el horario solicitado; estas opciones usan otros horarios libres."
+
+        return render_template(
+            "reserva.html",
+            app_name=app.config["APP_NAME"],
+            tagline=app.config["APP_TAGLINE"],
+            valores=valores,
+            nombres_dias=nombres_dias,
+            dias_seleccionados=dias_seleccionados,
+            horas_reserva=horas_reserva,
+            resultado=resultado,
+            error=error,
+            aviso=aviso,
+            reservada=reservada,
+            fecha_minima=FECHA_INICIO_CRONOGRAMA,
+            fecha_maxima=FECHA_FIN_CRONOGRAMA,
+        )
 
     @app.route("/cronograma")
     def cronograma():
@@ -172,6 +288,7 @@ def create_app():
                             "aula": fila["AULA"],
                             "seccion": fila["SECCION"],
                             "solicitante": solicitante,
+                            "descripcion": fila.get("DESCRIPCION", "").strip(),
                             "contacto": fila.get("CONTACTO", "").strip(),
                         }
                     )

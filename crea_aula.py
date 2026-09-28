@@ -32,7 +32,7 @@ NOMBRE_ARCHIVO = "aula.dat"
 NOMBRE_ARCHIVO_CRONOGRAMA = "cronograma.dat"
 DELIMITADOR = ";"
 ENCABEZADO_CRONOGRAMA = [
-    "AULA", "SECCION", "FECHA", "HORAINI", "SOLICITANTE", "CONTACTO"
+    "AULA", "SECCION", "FECHA", "HORAINI", "SOLICITANTE", "CONTACTO", "DESCRIPCION"
 ]
 FECHA_INICIO = date(2026, 9, 1)
 FECHA_FIN = date(2028, 12, 31)
@@ -66,6 +66,7 @@ def crear_cronograma_dat(
                         hora.strftime("%H:%M"),
                         "",
                         "",
+                        ""
                     ])
                     cantidad_registros += 1
                 hora += timedelta(minutes=30)

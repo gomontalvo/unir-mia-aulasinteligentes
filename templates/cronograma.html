@@ -157,7 +157,8 @@
                                 <div class="schedule-entry {% if entrada.solicitante %}is-reserved{% else %}is-open{% endif %}">
                                     <strong>Aula {{ entrada.aula }} · {{ entrada.seccion }}</strong>
                                     {% if entrada.solicitante %}
-                                    <span>{{ entrada.solicitante }}</span>
+                                    <span>{{ entrada.solicitante[:15] }}</span>
+                                    {% if entrada.descripcion %}<small>{{ entrada.descripcion[:15] }}</small>{% endif %}
                                     {% if entrada.contacto %}<small>{{ entrada.contacto }}</small>{% endif %}
                                     {% else %}
                                     <span>Disponible</span>

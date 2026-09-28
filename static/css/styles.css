@@ -359,3 +359,85 @@ a.calendar-day:focus-visible {
     .calendar-day { min-height: 42px; }
     .schedule-legend { gap: 0.65rem; }
 }
+
+/* RESERVAS */
+.reservation-heading {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+.reservation-form-section {
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+.booking-form .form-label,
+.booking-form legend {
+    color: var(--color-text);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+.weekday-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.weekday-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface);
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+.weekday-option input,
+.reservation-option input[type="radio"] {
+    accent-color: var(--color-primary-dark);
+}
+.reservation-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+.reservation-option {
+    display: flex;
+    gap: 0.7rem;
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface);
+    cursor: pointer;
+}
+.reservation-option:has(input:checked) {
+    border-color: var(--color-primary-dark);
+    box-shadow: inset 0 0 0 1px var(--color-primary-dark);
+}
+.reservation-option input { margin-top: 0.25rem; }
+.reservation-option-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+.reservation-option-title {
+    color: var(--color-text);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.reservation-option-details,
+.reservation-option-note {
+    color: var(--color-text-muted);
+    font-size: 0.83rem;
+    overflow-wrap: anywhere;
+}
+.reservation-option-note { color: var(--color-primary-dark); }
+
+@media (max-width: 991.98px) {
+    .reservation-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575.98px) {
+    .reservation-options { grid-template-columns: 1fr; }
+}

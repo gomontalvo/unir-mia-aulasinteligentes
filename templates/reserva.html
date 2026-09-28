@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Reserva de aula | {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="reservation-heading">
+    <div class="container py-4">
+        <p class="schedule-eyebrow mb-2">Gestión de espacios</p>
+        <h1 class="section-title mb-1">Buscar una reserva</h1>
+        <p class="text-muted mb-0">Indica las fechas, horario y tamaño del grupo para encontrar aulas disponibles.</p>
+    </div>
+</header>
+
+<main class="container py-4 reservation-page">
+    {% if reservada %}
+    <div class="alert alert-success" role="status">Reserva realizada correctamente. Los horarios quedaron registrados.</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% endif %}
+    {% if aviso %}
+    <div class="alert alert-info" role="status">{{ aviso }}</div>
+    {% endif %}
+
+    <section class="reservation-form-section" aria-labelledby="datosReservaTitulo">
+        <h2 id="datosReservaTitulo" class="schedule-section-title mb-3">Datos de la solicitud</h2>
+        <form action="{{ url_for('reserva_page') }}" method="post" class="booking-form">
+            <input type="hidden" name="accion" value="buscar">
+            <div class="row g-3">
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <label for="fecha_inicio" class="form-label">Fecha inicial</label>
+                    <input id="fecha_inicio" name="fecha_inicio" type="date" class="form-control"
+                           value="{{ valores.fecha_inicio }}" min="{{ fecha_minima.isoformat() }}"
+                           max="{{ fecha_maxima.isoformat() }}" required>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <label for="fecha_fin" class="form-label">Fecha final</label>
+                    <input id="fecha_fin" name="fecha_fin" type="date" class="form-control"
+                           value="{{ valores.fecha_fin }}" min="{{ fecha_minima.isoformat() }}"
+                           max="{{ fecha_maxima.isoformat() }}" required>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="horario" class="form-label">Hora inicial</label>
+                    <select id="horario" name="horario" class="form-select" required>
+                        {% for hora in horas_reserva %}
+                        <option value="{{ hora }}" {% if hora == valores.horario %}selected{% endif %}>{{ hora }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="horario_fin" class="form-label">Hora final</label>
+                    <select id="horario_fin" name="horario_fin" class="form-select" required>
+                        {% for hora in horas_reserva %}
+                        <option value="{{ hora }}" {% if hora == valores.horario_fin %}selected{% endif %}>{{ hora }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Cierre del bloque; espacios de 30 minutos.</small>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="alumnos" class="form-label">Número de alumnos</label>
+                    <input id="alumnos" name="alumnos" type="number" class="form-control"
+                           min="1" step="1" value="{{ valores.alumnos }}" required>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label for="solicitante" class="form-label">Solicitante</label>
+                    <input id="solicitante" name="solicitante" type="text" class="form-control"
+                           value="{{ valores.solicitante }}" maxlength="120" required>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label for="contacto" class="form-label">Mail o teléfono de contacto</label>
+                    <input id="contacto" name="contacto" type="text" class="form-control"
+                           value="{{ valores.contacto }}" maxlength="160" autocomplete="email">
+                </div>
+                <div class="col-12">
+                    <label for="descripcion" class="form-label">Descripción</label>
+                    <textarea id="descripcion" name="descripcion" class="form-control" rows="3"
+                              maxlength="500" required>{{ valores.descripcion }}</textarea>
+                </div>
+                <fieldset class="col-12">
+                    <legend class="form-label mb-2">Carga semanal</legend>
+                    <div class="weekday-options">
+                        {% for dia in nombres_dias %}
+                        <label class="weekday-option" for="dia-{{ loop.index0 }}">
+                            <input id="dia-{{ loop.index0 }}" name="dias_semana" type="checkbox"
+                                   value="{{ loop.index0 }}" {% if loop.index0|string in dias_seleccionados %}checked{% endif %}>
+                            <span>{{ dia }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-app-primary">
+                        <i class="bi bi-search" aria-hidden="true"></i> Buscar reserva
+                    </button>
+                    <a href="{{ url_for('reserva_page') }}" class="btn btn-app-outline">Limpiar</a>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    {% if resultado and resultado.opciones %}
+    <section class="reservation-results mt-5" aria-labelledby="opcionesTitulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+            <div>
+                <h2 id="opcionesTitulo" class="schedule-section-title mb-1">Opciones disponibles</h2>
+                <p class="text-muted small mb-0">
+                    {{ resultado.fechas|length }} fechas · {{ resultado.fechas[0].strftime('%d/%m/%Y') }} a
+                    {{ resultado.fechas[-1].strftime('%d/%m/%Y') }}
+                </p>
+            </div>
+            <span class="schedule-period">Selecciona una opción para continuar</span>
+        </div>
+
+        <form action="{{ url_for('reserva_page') }}" method="post">
+            <input type="hidden" name="accion" value="realizar">
+            <input type="hidden" name="fecha_inicio" value="{{ valores.fecha_inicio }}">
+            <input type="hidden" name="fecha_fin" value="{{ valores.fecha_fin }}">
+            <input type="hidden" name="horario" value="{{ valores.horario }}">
+            <input type="hidden" name="horario_fin" value="{{ valores.horario_fin }}">
+            <input type="hidden" name="alumnos" value="{{ valores.alumnos }}">
+            <input type="hidden" name="solicitante" value="{{ valores.solicitante }}">
+            <input type="hidden" name="descripcion" value="{{ valores.descripcion }}">
+            <input type="hidden" name="contacto" value="{{ valores.contacto }}">
+            {% for dia in dias_seleccionados %}
+            <input type="hidden" name="dias_semana" value="{{ dia }}">
+            {% endfor %}
+
+            <div class="reservation-options">
+                {% for opcion in resultado.opciones %}
+                <label class="reservation-option" for="opcion-{{ loop.index }}">
+                    <input id="opcion-{{ loop.index }}" type="radio" name="opcion"
+                              value="{{ opcion.aula }}|{{ opcion.secciones|join(',') }}|{{ opcion.horario }}|{{ opcion.horario_fin }}" required>
+                    <span class="reservation-option-content">
+                        <span class="reservation-option-title">{{ opcion.nombre }}</span>
+                        <span class="reservation-option-details">
+                            {{ opcion.horario }}–{{ opcion.horario_fin }} · {{ opcion.capacidad }} lugares para {{ opcion.alumnos }} alumnos
+                        </span>
+                        {% if opcion.secciones|length > 1 %}
+                        <span class="reservation-option-note">Se combinarán secciones de la misma aula.</span>
+                        {% endif %}
+                        {% if opcion.adyacente %}
+                        <span class="reservation-option-note"><i class="bi bi-geo-alt" aria-hidden="true"></i> Aula adyacente a otra actividad.</span>
+                        {% endif %}
+                        {% if not opcion.horario_solicitado %}
+                        <span class="reservation-option-note">Horario alternativo al solicitado.</span>
+                        {% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-app-primary mt-3">Realizar Reserva</button>
+        </form>
+    </section>
+    {% elif resultado and resultado.motivo == 'capacidad' %}
+    <section class="reservation-results mt-5" aria-live="polite">
+        <h2 class="schedule-section-title">Capacidad insuficiente</h2>
+        <p>No se puede cubrir el grupo combinando secciones de una misma aula. La capacidad máxima es
+            <strong>{{ resultado.capacidad_maxima }} alumnos</strong>.</p>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
