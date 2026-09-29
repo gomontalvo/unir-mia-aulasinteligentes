@@ -1,12 +1,12 @@
 :root {
-    --color-bg: #F5F1EA;
+    --color-bg: #F2F8FC;
     --color-surface: #FFFFFF;
     --color-text: #1F1E1D;
     --color-text-muted: #6A6660;
-    --color-border: #E8E2D6;
-    --color-primary: #D97757;
-    --color-primary-dark: #BD5D3A;
-    --color-primary-soft: #F1E2D5;
+    --color-border: #D9E8F0;
+    --color-primary: #55A9D2;
+    --color-primary-dark: #2D7FA8;
+    --color-primary-soft: #DFF1F9;
     --font-heading: 'Source Serif 4', Georgia, serif;
     --font-body: 'Inter', system-ui, sans-serif;
 }
@@ -186,6 +186,23 @@ body {
 .powered-by i { color: var(--color-primary); }
 
 /* CRONOGRAMA */
+.schedule-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    display: grid;
+    place-items: center;
+    background: rgb(255 255 255 / 65%);
+}
+.schedule-loading[hidden] { display: none; }
+.schedule-loading i {
+    color: #0878d1;
+    font-size: 3rem;
+    animation: schedule-clover-spin 0.9s linear infinite;
+}
+@keyframes schedule-clover-spin {
+    to { transform: rotate(360deg); }
+}
 .schedule-heading {
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -300,7 +317,7 @@ a.calendar-day:focus-visible {
     top: 0;
     z-index: 1;
     height: 58px;
-    background: #f1eee8;
+    background: #EAF4F9;
     color: var(--color-text-muted);
     font-size: 0.78rem;
     text-align: center;
@@ -316,7 +333,7 @@ a.calendar-day:focus-visible {
     z-index: 2;
     width: 72px;
     min-width: 72px;
-    background: #faf8f4;
+    background: #F4FAFD;
     color: var(--color-text-muted);
     font-size: 0.78rem;
     font-variant-numeric: tabular-nums;
@@ -324,7 +341,7 @@ a.calendar-day:focus-visible {
 }
 .week-grid td { height: 56px; }
 .week-grid td.is-outside-range,
-.week-grid th.is-outside-range { background: #f1eee8; }
+.week-grid th.is-outside-range { background: #EAF4F9; }
 .schedule-entry {
     display: flex;
     flex-direction: column;

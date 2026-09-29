@@ -1,11 +1,11 @@
 # Aulas Inteligentes con IA
 
 Aplicación web para la gestión de **aulas inteligentes potenciadas por IA**, construida con
-**Python (Flask)**, **HTML5** y **Bootstrap 5**. Integra la API de **Claude (Anthropic)** para
+**Python (Flask)**, **HTML5** y **Bootstrap 5**. Integra la API de **OpenAI** para
 funciones de inteligencia artificial dentro del aula (asistente docente, resúmenes,
 generación de material, etc.).
 
-![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude-D97757?style=flat-square)
+![Powered by OpenAI](https://img.shields.io/badge/Powered%20by-OpenAI-412991?style=flat-square)
 
 ---
 
@@ -22,7 +22,7 @@ aulas-inteligentes-ia/
 │   ├── base.html             # Plantilla base (navbar, footer, estilos)
 │   └── index.html            # Página de inicio "Aulas Inteligentes con IA"
 └── static/
-    ├── css/styles.css         # Estilos con paleta de color estilo Claude
+    ├── css/styles.css         # Estilos con paleta coral
     ├── js/main.js              # Lógica de interacción / llamadas a la API
     └── img/                    # Recursos gráficos (logo, íconos, etc.)
 ```
@@ -31,7 +31,7 @@ aulas-inteligentes-ia/
 
 - Python 3.10 o superior
 - Cuenta de [GitHub](https://github.com)
-- (Opcional) API Key de Anthropic si vas a usar el asistente de IA: https://console.anthropic.com/
+- (Opcional) API Key de OpenAI si vas a usar el asistente de IA: https://platform.openai.com/api-keys
 
 ## ⚙️ Instalación local
 
@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 # 4. Configurar variables de entorno
 cp .env.example .env
-# Editar .env y agregar tu ANTHROPIC_API_KEY (opcional)
+# Editar .env y agregar tu OPENAI_API_KEY (opcional)
 
 # 5. Ejecutar la aplicación
 python app.py
@@ -72,7 +72,7 @@ git push -u origin main
 
 ## 🎨 Paleta de color
 
-El diseño usa una paleta inspirada en la identidad visual de Claude (Anthropic):
+El diseño usa una paleta cálida con acentos coral:
 
 | Uso                | Color     |
 |--------------------|-----------|
@@ -86,7 +86,7 @@ El diseño usa una paleta inspirada en la identidad visual de Claude (Anthropic)
 ## 🧩 Próximos pasos sugeridos
 
 - Añadir autenticación de usuarios (Flask-Login) para docentes y estudiantes.
-- Conectar la ruta `/api/asistente` con la API de Claude para respuestas reales (ya incluida como stub).
+- Mejorar la integración de la ruta `/api/asistente` con la API de OpenAI.
 - Agregar una base de datos (SQLite/PostgreSQL) para aulas, cursos y usuarios.
 - Desplegar en Render, Railway o un servidor propio.
 

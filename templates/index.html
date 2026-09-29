@@ -23,7 +23,7 @@
                     </a>
                     <form action="{{ url_for('crear_aula') }}" method="post">
                         <button type="submit" class="btn btn-app-outline btn-lg">
-                            <i class="bi bi-plus-square"></i> Crear archivo de aulas
+                            <i class="bi bi-plus-square"></i> Inicializar aulas
                         </button>
                     </form>
                 </div>
@@ -34,14 +34,7 @@
                     <i class="bi bi-stars"></i> Created by <strong>Humberto Villaseñor y Omar Montalvo</strong>
                 </p>
             </div>
-            <div class="col-lg-5">
-                <div class="hero-card">
-                    <div class="hero-card-dot"></div>
-                    <p class="hero-card-line">🧠 Asistente activo</p>
-                    <p class="hero-card-line">📊 3 aulas conectadas</p>
-                    <p class="hero-card-line">✅ Reportes generados hoy: 12</p>
-                </div>
-            </div>
+
         </div>
     </div>
 </header>
@@ -95,13 +88,13 @@
 <section id="asistente" class="container py-5">
     <div class="assistant-panel">
         <h2 class="section-title"><i class="bi bi-stars"></i> Asistente de Aula</h2>
-        <p class="text-muted">Escribe una pregunta y el asistente (impulsado por Claude) te responderá.</p>
+        <p class="text-muted">Escribe una pregunta y el asistente (impulsado por OpenAI) te responderá.</p>
 
         <div id="chatHistorial" class="chat-historial mb-3"></div>
 
         <form id="formAsistente" class="d-flex gap-2">
             <input type="text" id="mensajeInput" class="form-control"
-                   placeholder="Ej: Explícame la fotosíntesis para 5to grado" required>
+                   placeholder="Ej: Por favor indicame que clases tengo hoy" required>
             <button type="submit" class="btn btn-app-primary">
                 <i class="bi bi-send"></i>
             </button>

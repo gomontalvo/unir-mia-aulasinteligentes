@@ -1,5 +1,6 @@
 import calendar
 import csv
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from threading import Lock
@@ -10,11 +11,11 @@ from config import Config
 from crea_aula import crear_archivo_dat
 from reserva import buscar_reservas, guardar_reserva
 
-# Cliente oficial de Anthropic (se usa únicamente si hay API key configurada)
+# Cliente oficial de OpenAI (se usa únicamente si hay API key configurada)
 try:
-    import anthropic
+    from openai import OpenAI
 except ImportError:
-    anthropic = None
+    OpenAI = None
     
 DELIMITADOR=";"
 NOMBRE_ARCHIVO = "aula.dat"
@@ -25,6 +26,82 @@ def cargar_dataframe(nombre_archivo:str):
     """Carga el archivo .dat en un DataFrame de pandas."""
     df = pd.read_csv(nombre_archivo, sep=DELIMITADOR, encoding="utf-8")
     return df
+
+
+def recuperar_contexto_asistente(mensaje, ruta_aulas, ruta_cronograma, ahora=None):
+    """Recupera aulas relevantes y sus tres próximas franjas libres."""
+    ahora = ahora or datetime.now()
+    ruta_aulas = Path(ruta_aulas)
+    if not ruta_aulas.exists():
+        return "Los datos de aulas no están disponibles.", []
+
+    df_aula = pd.read_csv(
+        ruta_aulas,
+        sep=DELIMITADOR,
+        encoding="utf-8",
+        dtype=str,
+        keep_default_na=False,
+    )
+    mensaje_normalizado = mensaje.casefold()
+    numeros_aula = set(re.findall(r"\baula\s*(\d+)\b", mensaje_normalizado))
+    secciones = set(re.findall(r"\bsecci[oó]n\s+([a-z])\b", mensaje_normalizado))
+    ubicaciones = set(re.findall(r"\bp\d+\b", mensaje_normalizado))
+    df_aula["AULA"] = df_aula["AULA"].astype(str)
+    df_aula["SECCION"] = df_aula["SECCION"].astype(str)
+    df_aula["UBICACION"] = df_aula["UBICACION"].astype(str)
+
+    filtro = pd.Series(True, index=df_aula.index)
+    if numeros_aula:
+        filtro &= df_aula["AULA"].isin(numeros_aula)
+    if secciones:
+        filtro &= df_aula["SECCION"].str.casefold().isin(secciones)
+    if ubicaciones:
+        filtro &= df_aula["UBICACION"].str.casefold().isin(ubicaciones)
+    aulas_relevantes = df_aula.loc[filtro] if (numeros_aula or secciones or ubicaciones) else df_aula
+    claves_aula = set(zip(aulas_relevantes["AULA"], aulas_relevantes["SECCION"]))
+
+    lineas_aulas = [
+        f"Aula {fila['AULA']}, sección {fila['SECCION']}: capacidad {fila['CAPACIDAD']}, "
+        f"ubicación {fila['UBICACION']}, adyacentes {fila['ADYACENTE'] or 'ninguna'}."
+        for _, fila in aulas_relevantes.iterrows()
+    ]
+    lineas_horarios = []
+    ruta_cronograma = Path(ruta_cronograma)
+    if claves_aula and ruta_cronograma.exists():
+        df_horarios = pd.read_csv(
+            ruta_cronograma,
+            sep=DELIMITADOR,
+            encoding="utf-8",
+            dtype=str,
+            keep_default_na=False,
+            usecols=["AULA", "SECCION", "FECHA", "HORAINI", "SOLICITANTE"],
+        )
+        claves_relevantes = {f"{aula}|{seccion}" for aula, seccion in claves_aula}
+        df_horarios = df_horarios[
+            df_horarios["AULA"].add("|").add(df_horarios["SECCION"]).isin(claves_relevantes)
+            & df_horarios["SOLICITANTE"].str.strip().eq("")
+        ].copy()
+        df_horarios["_instante"] = pd.to_datetime(
+            df_horarios["FECHA"] + " " + df_horarios["HORAINI"],
+            format="%d/%m/%Y %H:%M",
+            errors="coerce",
+        )
+        df_horarios = df_horarios[
+            df_horarios["_instante"].notna() & (df_horarios["_instante"] >= ahora)
+        ].sort_values("_instante")
+        for instante, franjas in df_horarios.groupby("_instante", sort=True):
+            aulas_disponibles = ", ".join(
+                f"Aula {fila['AULA']} sección {fila['SECCION']}"
+                for _, fila in franjas.iterrows()
+            )
+            lineas_horarios.append(f"{instante:%d/%m/%Y %H:%M}: {aulas_disponibles}")
+            if len(lineas_horarios) == 3:
+                break
+
+    contexto = "Aulas:\n" + ("\n".join(lineas_aulas) or "No hay aulas que coincidan con la consulta.")
+    contexto += "\nPróximas franjas disponibles:\n"
+    contexto += "\n".join(lineas_horarios) or "No hay franjas disponibles en los datos."
+    return contexto, lineas_horarios
  
 def create_app():
     app = Flask(__name__)
@@ -182,7 +259,8 @@ def create_app():
 
     @app.route("/cronograma")
     def cronograma():
-        mes = request.args.get("mes", "2026-09")
+        hoy = date.today()
+        mes = request.args.get("mes", hoy.strftime("%Y-%m"))
         try:
             anio, numero_mes = (int(parte) for parte in mes.split("-", 1))
             mes_fecha = date(anio, numero_mes, 1)
@@ -198,9 +276,11 @@ def create_app():
         mes = mes_fecha.strftime("%Y-%m")
 
         try:
-            fecha_seleccionada = date.fromisoformat(request.args.get("fecha", ""))
+            fecha_seleccionada = date.fromisoformat(
+                request.args.get("fecha", hoy.isoformat())
+            )
         except ValueError:
-            fecha_seleccionada = FECHA_INICIO_CRONOGRAMA
+            fecha_seleccionada = hoy
 
         if (
             fecha_seleccionada.strftime("%Y-%m") != mes
@@ -342,13 +422,13 @@ def create_app():
         )
 
     # ------------------------------------------------------------------
-    # API: asistente de IA (Claude)
+    # API: asistente de IA (OpenAI)
     # ------------------------------------------------------------------
     @app.route("/api/asistente", methods=["POST"])
     def asistente():
         """
-        Recibe un mensaje del usuario y responde usando la API de Claude.
-        Requiere ANTHROPIC_API_KEY configurada en el archivo .env
+        Recibe un mensaje del usuario y responde usando la API de OpenAI.
+        Requiere OPENAI_API_KEY configurada en el archivo .env
         """
         data = request.get_json(silent=True) or {}
         mensaje = data.get("mensaje", "").strip()
@@ -356,25 +436,42 @@ def create_app():
         if not mensaje:
             return jsonify({"error": "El campo 'mensaje' es requerido."}), 400
 
-        if not app.config["ANTHROPIC_API_KEY"] or anthropic is None:
+        if not app.config["OPENAI_API_KEY"] or OpenAI is None:
             return jsonify({
                 "respuesta": "El asistente de IA aún no está configurado. "
-                             "Agrega tu ANTHROPIC_API_KEY en el archivo .env para activarlo."
+                             "Agrega tu OPENAI_API_KEY en el archivo .env para activarlo."
             })
 
         try:
-            client = anthropic.Anthropic(api_key=app.config["ANTHROPIC_API_KEY"])
-            respuesta = client.messages.create(
-                model="claude-sonnet-4-6",
+            ruta_datos = Path(app.root_path)
+            contexto, _ = recuperar_contexto_asistente(
+                mensaje,
+                ruta_datos / NOMBRE_ARCHIVO,
+                ruta_datos / "cronograma.dat",
+            )
+            client = OpenAI(api_key=app.config["OPENAI_API_KEY"])
+            respuesta = client.chat.completions.create(
+                model="gpt-4o-mini",
                 max_tokens=500,
-                messages=[{"role": "user", "content": mensaje}],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Responde en español y usa los datos recuperados para preguntas sobre aulas "
+                            "y disponibilidad. Sé conciso, con un máximo de 120 palabras. Si una respuesta "
+                            "completa sería extensa, resume lo esencial y termina con las tres franjas "
+                            "disponibles más próximas del contexto. No inventes datos ni horarios; si hay "
+                            "menos de tres franjas, menciona solo las existentes.\n\n"
+                            f"{contexto}"
+                        ),
+                    },
+                    {"role": "user", "content": mensaje},
+                ],
             )
-            texto = "".join(
-                bloque.text for bloque in respuesta.content if bloque.type == "text"
-            )
+            texto = respuesta.choices[0].message.content or ""
             return jsonify({"respuesta": texto})
         except Exception as exc:  # pragma: no cover - manejo simple de errores
-            return jsonify({"error": f"Error al conectar con Claude: {exc}"}), 500
+            return jsonify({"error": f"Error al conectar con OpenAI: {exc}"}), 500
 
     # ------------------------------------------------------------------
     # Salud del servicio

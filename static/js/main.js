@@ -1,4 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const scheduleLoading = document.getElementById("scheduleLoading");
+    if (scheduleLoading) {
+        const showScheduleLoading = () => {
+            scheduleLoading.hidden = false;
+            document.body.setAttribute("aria-busy", "true");
+        };
+
+        document.querySelector(".schedule-filters form")?.addEventListener("submit", showScheduleLoading);
+        document.querySelectorAll(".calendar-day[href]").forEach((day) => {
+            day.addEventListener("click", showScheduleLoading);
+        });
+        window.addEventListener("pageshow", () => {
+            scheduleLoading.hidden = true;
+            document.body.removeAttribute("aria-busy");
+        });
+    }
+
     const form = document.getElementById("formAsistente");
     if (!form) return;
 
