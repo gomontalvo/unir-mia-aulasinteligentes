@@ -15,6 +15,8 @@ generación de material, etc.).
 aulas-inteligentes-ia/
 ├── app.py                  # Aplicación Flask (rutas y arranque)
 ├── config.py                # Configuración (variables de entorno)
+├── crea_aula.py              # Aplicación que crea estructura de  datos de aulas y cronograma
+├── reserva.py                # Aplicación que integra algoritmos de busqueda heuristica minimax (codigo genetico)
 ├── requirements.txt          # Dependencias de Python
 ├── .env.example               # Ejemplo de variables de entorno
 ├── .gitignore
