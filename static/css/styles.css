@@ -453,6 +453,31 @@ a.calendar-day:focus-visible {
 }
 .reservation-option-note { color: var(--color-primary-dark); }
 
+.cancel-reservation {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.35rem;
+    margin: 0.1rem 0;
+    padding: 0.35rem;
+    border-left: 3px solid #bd3f45;
+    border-radius: 3px;
+    background: #f8e6e5;
+    color: #852d32;
+    font-size: 0.7rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+.cancel-reservation input {
+    margin: 0.1rem 0 0;
+    accent-color: #bd3f45;
+}
+.cancel-reservation span,
+.cancel-reservation strong,
+.cancel-reservation small { display: block; }
+.cancel-week-navigation { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
 @media (max-width: 991.98px) {
     .reservation-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

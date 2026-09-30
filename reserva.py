@@ -359,3 +359,79 @@ def guardar_reserva(opcion, fechas, solicitante, descripcion, contacto, ruta_cro
         raise
 
     return len(actualizados)
+
+
+def cancelar_reservas(espacios, ruta_cronograma):
+    """Libera las franjas seleccionadas y conserva atómica la versión anterior."""
+    objetivos = set()
+    for espacio in espacios:
+        partes = espacio.split("|")
+        if len(partes) != 4:
+            raise ValueError("Uno de los espacios seleccionados no es válido.")
+        aula, seccion, fecha_texto, horario = partes
+        try:
+            fecha = date.fromisoformat(fecha_texto)
+            datetime.strptime(horario, "%H:%M")
+        except ValueError as exc:
+            raise ValueError("Uno de los espacios seleccionados no es válido.") from exc
+        if horario not in _horarios():
+            raise ValueError("Uno de los horarios seleccionados no es válido.")
+        objetivos.add((aula, seccion, fecha.strftime("%d/%m/%Y"), horario))
+
+    if not objetivos:
+        raise ValueError("Selecciona al menos un espacio reservado para cancelar.")
+
+    ruta = Path(ruta_cronograma)
+    with ruta.open(encoding="utf-8", newline="") as archivo:
+        lector = csv.DictReader(archivo, delimiter=DELIMITADOR)
+        campos = list(lector.fieldnames or [])
+        filas = list(lector)
+    if not campos or any(campo not in campos for campo in CAMPOS_CRONOGRAMA):
+        raise ValueError("El cronograma no tiene una cabecera válida para cancelar reservas.")
+
+    actualizados = set()
+    for fila in filas:
+        clave = (
+            fila.get("AULA", ""),
+            fila.get("SECCION", ""),
+            fila.get("FECHA", ""),
+            fila.get("HORAINI", ""),
+        )
+        if clave not in objetivos:
+            continue
+        if not (fila.get("SOLICITANTE") or "").strip():
+            raise ValueError("Uno de los espacios seleccionados ya no está reservado. Actualiza el calendario.")
+        fila["SOLICITANTE"] = ""
+        fila["CONTACTO"] = ""
+        fila["DESCRIPCION"] = ""
+        actualizados.add(clave)
+
+    if actualizados != objetivos:
+        raise ValueError("Uno o más espacios ya no existen en el cronograma. Actualiza el calendario.")
+
+    temporal = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=ruta.parent,
+            delete=False,
+        ) as archivo_temporal:
+            temporal = Path(archivo_temporal.name)
+            escritor = csv.DictWriter(
+                archivo_temporal,
+                fieldnames=campos,
+                delimiter=DELIMITADOR,
+                lineterminator="\n",
+                extrasaction="ignore",
+            )
+            escritor.writeheader()
+            escritor.writerows(filas)
+        temporal.replace(ruta)
+    except Exception:
+        if temporal is not None:
+            temporal.unlink(missing_ok=True)
+        raise
+
+    return len(actualizados)

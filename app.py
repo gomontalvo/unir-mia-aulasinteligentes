@@ -9,7 +9,7 @@ from flask import Flask, redirect, render_template, jsonify, request, url_for
 import pandas as pd
 from config import Config
 from crea_aula import crear_archivo_dat
-from reserva import buscar_reservas, guardar_reserva
+from reserva import buscar_reservas, cancelar_reservas, guardar_reserva
 
 # Cliente oficial de OpenAI (se usa únicamente si hay API key configurada)
 try:
@@ -365,6 +365,185 @@ def create_app():
             error=error,
             aviso=aviso,
             reservada=reservada,
+            fecha_minima=FECHA_INICIO_CRONOGRAMA,
+            fecha_maxima=FECHA_FIN_CRONOGRAMA,
+        )
+
+    @app.route("/cancelar", methods=["GET", "POST"])
+    def cancelar_page():
+        fecha_predeterminada = min(
+            max(date.today(), FECHA_INICIO_CRONOGRAMA), FECHA_FIN_CRONOGRAMA
+        )
+        valores = {
+            "fecha_inicio": request.values.get("fecha_inicio", fecha_predeterminada.isoformat()),
+            "fecha_fin": request.values.get("fecha_fin", fecha_predeterminada.isoformat()),
+            "solicitante": request.values.get("solicitante", "").strip(),
+            "aula": request.values.get("aula", "").strip(),
+            "horario_inicio": request.values.get("horario_inicio", "07:00"),
+            "horario_fin": request.values.get("horario_fin", "21:30"),
+        }
+        aulas_disponibles = []
+        archivo_aulas = Path(app.root_path) / NOMBRE_ARCHIVO
+        if archivo_aulas.exists():
+            with archivo_aulas.open(encoding="utf-8", newline="") as archivo:
+                aulas_disponibles = [
+                    {
+                        "clave": f"{fila['AULA']}|{fila['SECCION']}",
+                        "nombre": f"Aula {fila['AULA']} - Sección {fila['SECCION']}",
+                    }
+                    for fila in csv.DictReader(archivo, delimiter=DELIMITADOR)
+                ]
+        horas_disponibles = [
+            f"{minutos // 60:02d}:{minutos % 60:02d}"
+            for minutos in range(7 * 60, 21 * 60 + 31, 30)
+        ]
+        error = None
+        buscar = request.values.get("buscar") == "1" or request.method == "POST"
+        canceladas = request.args.get("canceladas", "")
+        semana_offset = 0
+        max_semana_offset = 0
+        dias_semana = []
+        filas_cronograma = []
+        cantidad_reservas = 0
+        accion = request.form.get("accion", "") if request.method == "POST" else ""
+
+        if buscar:
+            try:
+                if not all((valores["fecha_inicio"], valores["fecha_fin"], valores["horario_inicio"], valores["horario_fin"])):
+                    raise ValueError("Completa las fechas y los horarios obligatorios.")
+                fecha_inicio = date.fromisoformat(valores["fecha_inicio"])
+                fecha_fin = date.fromisoformat(valores["fecha_fin"])
+                if not FECHA_INICIO_CRONOGRAMA <= fecha_inicio <= FECHA_FIN_CRONOGRAMA:
+                    raise ValueError("La fecha inicial está fuera del período del cronograma.")
+                if not FECHA_INICIO_CRONOGRAMA <= fecha_fin <= FECHA_FIN_CRONOGRAMA:
+                    raise ValueError("La fecha final está fuera del período del cronograma.")
+                if fecha_fin < fecha_inicio:
+                    raise ValueError("La fecha final debe ser igual o posterior a la inicial.")
+                if valores["aula"] and valores["aula"] not in {
+                    aula["clave"] for aula in aulas_disponibles
+                }:
+                    raise ValueError("El aula seleccionada no existe.")
+                if valores["horario_inicio"] not in horas_disponibles or valores["horario_fin"] not in horas_disponibles:
+                    raise ValueError("Selecciona horarios válidos en intervalos de 30 minutos.")
+                minutos_inicio = int(valores["horario_inicio"][:2]) * 60 + int(valores["horario_inicio"][3:])
+                minutos_fin = int(valores["horario_fin"][:2]) * 60 + int(valores["horario_fin"][3:])
+                if minutos_fin <= minutos_inicio:
+                    raise ValueError("El horario final debe ser posterior al horario inicial.")
+
+                origen_semana = fecha_inicio - timedelta(days=fecha_inicio.weekday())
+                max_semana_offset = max(0, (fecha_fin - origen_semana).days // 7)
+                try:
+                    semana_offset = int(request.values.get("semana_offset", "0"))
+                except ValueError:
+                    semana_offset = 0
+                semana_offset = min(max(semana_offset, 0), max_semana_offset)
+                nombres_dias = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado")
+                dias_semana = [
+                    {
+                        "fecha": origen_semana + timedelta(days=semana_offset * 7 + indice),
+                        "nombre": nombres_dias[indice],
+                        "en_rango": fecha_inicio <= origen_semana + timedelta(days=semana_offset * 7 + indice) <= fecha_fin
+                        and FECHA_INICIO_CRONOGRAMA <= origen_semana + timedelta(days=semana_offset * 7 + indice) <= FECHA_FIN_CRONOGRAMA,
+                    }
+                    for indice in range(6)
+                ]
+
+                archivo_cronograma = Path(app.root_path) / "cronograma.dat"
+                if not archivo_cronograma.exists():
+                    raise ValueError("No existe cronograma.dat. Genera primero el cronograma de aulas.")
+
+                fechas_visibles = {dia["fecha"] for dia in dias_semana if dia["en_rango"]}
+                entradas_por_celda = {}
+                espacios_visibles = set()
+                with archivo_cronograma.open(encoding="utf-8", newline="") as archivo:
+                    lector = csv.DictReader(archivo, delimiter=DELIMITADOR)
+                    for fila in lector:
+                        try:
+                            fecha_fila = datetime.strptime(fila["FECHA"], "%d/%m/%Y").date()
+                            hora_fila = fila["HORAINI"]
+                            datetime.strptime(hora_fila, "%H:%M")
+                        except (KeyError, ValueError):
+                            continue
+                        solicitante = (fila.get("SOLICITANTE") or "").strip()
+                        if (
+                            fecha_fila not in fechas_visibles
+                            or not valores["horario_inicio"] <= hora_fila < valores["horario_fin"]
+                            or not solicitante
+                            or (valores["solicitante"] and valores["solicitante"].casefold() not in solicitante.casefold())
+                            or (valores["aula"] and f"{fila.get('AULA', '')}|{fila.get('SECCION', '')}" != valores["aula"])
+                        ):
+                            continue
+                        entrada = {
+                            "aula": fila.get("AULA", ""),
+                            "seccion": fila.get("SECCION", ""),
+                            "solicitante": solicitante,
+                            "descripcion": (fila.get("DESCRIPCION") or "").strip(),
+                            "contacto": (fila.get("CONTACTO") or "").strip(),
+                            "espacio": "|".join((
+                                fila.get("AULA", ""),
+                                fila.get("SECCION", ""),
+                                fecha_fila.isoformat(),
+                                hora_fila,
+                            )),
+                        }
+                        entradas_por_celda.setdefault((fecha_fila, hora_fila), []).append(entrada)
+                        espacios_visibles.add(entrada["espacio"])
+                        cantidad_reservas += 1
+
+                filas_cronograma = [
+                    {
+                        "hora": f"{minutos // 60:02d}:{minutos % 60:02d}",
+                        "dias": [
+                            {
+                                "en_rango": dia["en_rango"],
+                                "entradas": entradas_por_celda.get((dia["fecha"], f"{minutos // 60:02d}:{minutos % 60:02d}"), []),
+                            }
+                            for dia in dias_semana
+                        ],
+                    }
+                    for minutos in range(minutos_inicio, minutos_fin, 30)
+                ]
+
+                if accion == "cancelar":
+                    espacios = request.form.getlist("espacios")
+                    if not espacios:
+                        raise ValueError("Selecciona al menos un espacio reservado para cancelar.")
+                    if not set(espacios).issubset(espacios_visibles):
+                        raise ValueError("La selección ya no coincide con los filtros. Actualiza el calendario.")
+                    with candado_reservas:
+                        cantidad_cancelada = cancelar_reservas(
+                            espacios, archivo_cronograma
+                        )
+                    return redirect(url_for(
+                        "cancelar_page",
+                        buscar=1,
+                        fecha_inicio=fecha_inicio.isoformat(),
+                        fecha_fin=fecha_fin.isoformat(),
+                        solicitante=valores["solicitante"],
+                        aula=valores["aula"],
+                        horario_inicio=valores["horario_inicio"],
+                        horario_fin=valores["horario_fin"],
+                        semana_offset=semana_offset,
+                        canceladas=cantidad_cancelada,
+                    ))
+            except (ValueError, OSError) as exc:
+                error = str(exc) or "No se pudo consultar o actualizar el cronograma."
+
+        return render_template(
+            "cancelar.html",
+            app_name=app.config["APP_NAME"],
+            tagline=app.config["APP_TAGLINE"],
+            valores=valores,
+            horas_disponibles=horas_disponibles,
+            aulas_disponibles=aulas_disponibles,
+            dias_semana=dias_semana,
+            filas_cronograma=filas_cronograma,
+            cantidad_reservas=cantidad_reservas,
+            semana_offset=semana_offset,
+            max_semana_offset=max_semana_offset,
+            error=error,
+            buscar=buscar,
+            canceladas=canceladas,
             fecha_minima=FECHA_INICIO_CRONOGRAMA,
             fecha_maxima=FECHA_FIN_CRONOGRAMA,
         )

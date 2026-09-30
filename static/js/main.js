@@ -16,6 +16,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const cancelForm = document.getElementById("cancelReservationsForm");
+    if (cancelForm) {
+        cancelForm.addEventListener("submit", (event) => {
+            const seleccionadas = cancelForm.querySelectorAll('input[name="espacios"]:checked');
+            if (!seleccionadas.length) {
+                event.preventDefault();
+                window.alert("Selecciona al menos un espacio reservado para cancelar.");
+                return;
+            }
+            if (!window.confirm(`¿Cancelar ${seleccionadas.length} espacio(s) seleccionado(s)?`)) {
+                event.preventDefault();
+            }
+        });
+    }
+
     const form = document.getElementById("formAsistente");
     if (!form) return;
 

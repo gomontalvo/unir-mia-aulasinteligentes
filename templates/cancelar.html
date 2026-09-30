@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Cancelar reservas | {{ app_name }}{% endblock %}
+
+{% block content %}
+<header class="reservation-heading">
+    <div class="container py-4">
+        <p class="schedule-eyebrow mb-2">Gestión de espacios</p>
+        <h1 class="section-title mb-1">Cancelar reservas</h1>
+        <p class="text-muted mb-0">Filtra el cronograma y selecciona los espacios reservados que deseas liberar.</p>
+    </div>
+</header>
+
+<main class="container py-4 reservation-page">
+    {% if canceladas %}
+    <div class="alert alert-success" role="status">Se liberaron {{ canceladas }} espacio(s) del cronograma.</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <section class="reservation-form-section" aria-labelledby="filtrosCancelarTitulo">
+        <h2 id="filtrosCancelarTitulo" class="schedule-section-title mb-3">Filtros</h2>
+        <form action="{{ url_for('cancelar_page') }}" method="get" class="booking-form">
+            <input type="hidden" name="buscar" value="1">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="fecha_inicio" class="form-label">Fecha inicial</label>
+                    <input id="fecha_inicio" name="fecha_inicio" type="date" class="form-control"
+                           value="{{ valores.fecha_inicio }}" min="{{ fecha_minima.isoformat() }}"
+                           max="{{ fecha_maxima.isoformat() }}" required>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="fecha_fin" class="form-label">Fecha final</label>
+                    <input id="fecha_fin" name="fecha_fin" type="date" class="form-control"
+                           value="{{ valores.fecha_fin }}" min="{{ fecha_minima.isoformat() }}"
+                           max="{{ fecha_maxima.isoformat() }}" required>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="horario_inicio" class="form-label">Horario inicial</label>
+                    <select id="horario_inicio" name="horario_inicio" class="form-select" required>
+                        {% for hora in horas_disponibles %}
+                        <option value="{{ hora }}" {% if hora == valores.horario_inicio %}selected{% endif %}>{{ hora }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <label for="horario_fin" class="form-label">Horario final</label>
+                    <select id="horario_fin" name="horario_fin" class="form-select" required>
+                        {% for hora in horas_disponibles %}
+                        <option value="{{ hora }}" {% if hora == valores.horario_fin %}selected{% endif %}>{{ hora }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label for="solicitante" class="form-label">Solicitante <span class="text-muted">(opcional)</span></label>
+                    <input id="solicitante" name="solicitante" type="search" class="form-control"
+                           value="{{ valores.solicitante }}" maxlength="120" placeholder="Filtrar nombre">
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label for="aula" class="form-label">Aula <span class="text-muted">(opcional)</span></label>
+                    <select id="aula" name="aula" class="form-select">
+                        <option value="">Todas las aulas</option>
+                        {% for aula in aulas_disponibles %}
+                        <option value="{{ aula.clave }}" {% if aula.clave == valores.aula %}selected{% endif %}>
+                            {{ aula.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-app-primary">
+                        <i class="bi bi-search" aria-hidden="true"></i> Mostrar calendario
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    {% if buscar and not error %}
+    <section class="week-section mt-5" aria-labelledby="semanaCancelarTitulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+            <div>
+                <h2 id="semanaCancelarTitulo" class="schedule-section-title mb-1">Reservas de la semana</h2>
+                <p class="text-muted small mb-0">
+                    {{ dias_semana[0].fecha.strftime('%d/%m/%Y') }} – {{ dias_semana[5].fecha.strftime('%d/%m/%Y') }}
+                    · {{ cantidad_reservas }} espacio(s) reservado(s) en el filtro
+                </p>
+            </div>
+            <nav class="cancel-week-navigation" aria-label="Navegar semanas del rango">
+                {% if semana_offset > 0 %}
+                <a class="btn btn-app-outline btn-sm"
+                   href="{{ url_for('cancelar_page', buscar=1, fecha_inicio=valores.fecha_inicio, fecha_fin=valores.fecha_fin, solicitante=valores.solicitante, aula=valores.aula, horario_inicio=valores.horario_inicio, horario_fin=valores.horario_fin, semana_offset=semana_offset - 1) }}">
+                    <i class="bi bi-arrow-left" aria-hidden="true"></i> Semana anterior
+                </a>
+                {% endif %}
+                {% if semana_offset < max_semana_offset %}
+                <a class="btn btn-app-outline btn-sm"
+                   href="{{ url_for('cancelar_page', buscar=1, fecha_inicio=valores.fecha_inicio, fecha_fin=valores.fecha_fin, solicitante=valores.solicitante, aula=valores.aula, horario_inicio=valores.horario_inicio, horario_fin=valores.horario_fin, semana_offset=semana_offset + 1) }}">
+                    Semana siguiente <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+
+        <form id="cancelReservationsForm" action="{{ url_for('cancelar_page') }}" method="post">
+            <input type="hidden" name="accion" value="cancelar">
+            <input type="hidden" name="fecha_inicio" value="{{ valores.fecha_inicio }}">
+            <input type="hidden" name="fecha_fin" value="{{ valores.fecha_fin }}">
+            <input type="hidden" name="solicitante" value="{{ valores.solicitante }}">
+            <input type="hidden" name="aula" value="{{ valores.aula }}">
+            <input type="hidden" name="horario_inicio" value="{{ valores.horario_inicio }}">
+            <input type="hidden" name="horario_fin" value="{{ valores.horario_fin }}">
+            <input type="hidden" name="semana_offset" value="{{ semana_offset }}">
+
+            <div class="week-grid-scroll">
+                <table class="week-grid">
+                    <thead>
+                        <tr>
+                            <th class="time-column" scope="col">Hora</th>
+                            {% for dia in dias_semana %}
+                            <th scope="col" class="{% if not dia.en_rango %}is-outside-range{% endif %}">
+                                <span>{{ dia.nombre }}</span>
+                                <strong>{{ dia.fecha.strftime('%d/%m') }}</strong>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in filas_cronograma %}
+                        <tr>
+                            <th class="time-column" scope="row">{{ fila.hora }}</th>
+                            {% for celda in fila.dias %}
+                            <td class="{% if not celda.en_rango %}is-outside-range{% endif %}">
+                                {% if not celda.en_rango %}
+                                <span class="empty-slot">Fuera del rango</span>
+                                {% elif celda.entradas %}
+                                    {% for entrada in celda.entradas %}
+                                    <label class="cancel-reservation" for="espacio-{{ entrada.espacio|replace('|', '-')|replace(':', '-') }}">
+                                        <input id="espacio-{{ entrada.espacio|replace('|', '-')|replace(':', '-') }}"
+                                               type="checkbox" name="espacios" value="{{ entrada.espacio }}">
+                                        <span>
+                                            <strong>Aula {{ entrada.aula }} · {{ entrada.seccion }}</strong>
+                                            {{ entrada.solicitante }}
+                                            {% if entrada.descripcion %}<small>{{ entrada.descripcion }}</small>{% endif %}
+                                            {% if entrada.contacto %}<small>{{ entrada.contacto }}</small>{% endif %}
+                                        </span>
+                                    </label>
+                                    {% endfor %}
+                                {% else %}
+                                <span class="empty-slot">Sin reservas</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                <p class="text-muted small mb-0">Al cancelar se vacían el solicitante, contacto y descripción seleccionados.</p>
+                <button type="submit" class="btn btn-danger" {% if not cantidad_reservas %}disabled{% endif %}>
+                    <i class="bi bi-calendar-x" aria-hidden="true"></i> Cancelar reservas seleccionadas
+                </button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
