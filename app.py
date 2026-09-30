@@ -29,11 +29,11 @@ def cargar_dataframe(nombre_archivo:str):
 
 
 def recuperar_contexto_asistente(mensaje, ruta_aulas, ruta_cronograma, ahora=None):
-    """Recupera aulas relevantes y sus tres próximas franjas libres."""
+    """Recupera datos semanales de aulas y reservas relevantes para la consulta."""
     ahora = ahora or datetime.now()
     ruta_aulas = Path(ruta_aulas)
     if not ruta_aulas.exists():
-        return "Los datos de aulas no están disponibles.", []
+        return "Los datos de aulas no están disponibles.", False
 
     df_aula = pd.read_csv(
         ruta_aulas,
@@ -46,6 +46,46 @@ def recuperar_contexto_asistente(mensaje, ruta_aulas, ruta_cronograma, ahora=Non
     numeros_aula = set(re.findall(r"\baula\s*(\d+)\b", mensaje_normalizado))
     secciones = set(re.findall(r"\bsecci[oó]n\s+([a-z])\b", mensaje_normalizado))
     ubicaciones = set(re.findall(r"\bp\d+\b", mensaje_normalizado))
+    fecha_filtro = None
+    fecha_texto = re.search(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\b", mensaje)
+    if fecha_texto:
+        for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                fecha_filtro = datetime.strptime(fecha_texto.group(1), formato).date()
+                break
+            except ValueError:
+                continue
+    elif re.search(r"\bhoy\b", mensaje_normalizado):
+        fecha_filtro = ahora.date()
+    elif re.search(r"\bma[ñn]ana\b", mensaje_normalizado):
+        fecha_filtro = (ahora + timedelta(days=1)).date()
+
+    semana_siguiente = bool(
+        re.search(
+            r"\b(?:pr[oó]xima|siguiente)\s+semana\b|\bsemana\s+que\s+viene\b",
+            mensaje_normalizado,
+        )
+    )
+    consulta_semanal = bool(re.search(r"\bsemana\b", mensaje_normalizado))
+    if fecha_filtro:
+        fecha_referencia = fecha_filtro
+    else:
+        fecha_referencia = ahora.date()
+    if semana_siguiente:
+        fecha_referencia += timedelta(days=7)
+    if consulta_semanal or not fecha_filtro:
+        inicio_periodo = fecha_referencia - timedelta(days=fecha_referencia.weekday())
+        fin_periodo = inicio_periodo + timedelta(days=5)
+    else:
+        inicio_periodo = fin_periodo = fecha_referencia
+
+    nombre_filtro = ""
+    nombre_explicito = re.search(
+        r"\b(?:nombre|solicitante)\s*[:=]\s*([^\n,;.!?]+)", mensaje, re.IGNORECASE
+    )
+    if nombre_explicito:
+        nombre_filtro = nombre_explicito.group(1).strip()
+
     df_aula["AULA"] = df_aula["AULA"].astype(str)
     df_aula["SECCION"] = df_aula["SECCION"].astype(str)
     df_aula["UBICACION"] = df_aula["UBICACION"].astype(str)
@@ -65,43 +105,115 @@ def recuperar_contexto_asistente(mensaje, ruta_aulas, ruta_cronograma, ahora=Non
         f"ubicación {fila['UBICACION']}, adyacentes {fila['ADYACENTE'] or 'ninguna'}."
         for _, fila in aulas_relevantes.iterrows()
     ]
-    lineas_horarios = []
+    lineas_disponibilidad = []
+    lineas_reservas = []
     ruta_cronograma = Path(ruta_cronograma)
-    if claves_aula and ruta_cronograma.exists():
-        df_horarios = pd.read_csv(
+    if ruta_cronograma.exists():
+        df_cronograma = pd.read_csv(
             ruta_cronograma,
             sep=DELIMITADOR,
             encoding="utf-8",
             dtype=str,
             keep_default_na=False,
-            usecols=["AULA", "SECCION", "FECHA", "HORAINI", "SOLICITANTE"],
+            usecols=[
+                "AULA", "SECCION", "FECHA", "HORAINI", "SOLICITANTE", "CONTACTO", "DESCRIPCION"
+            ],
         )
         claves_relevantes = {f"{aula}|{seccion}" for aula, seccion in claves_aula}
-        df_horarios = df_horarios[
-            df_horarios["AULA"].add("|").add(df_horarios["SECCION"]).isin(claves_relevantes)
-            & df_horarios["SOLICITANTE"].str.strip().eq("")
-        ].copy()
-        df_horarios["_instante"] = pd.to_datetime(
-            df_horarios["FECHA"] + " " + df_horarios["HORAINI"],
+        df_cronograma["_instante"] = pd.to_datetime(
+            df_cronograma["FECHA"] + " " + df_cronograma["HORAINI"],
             format="%d/%m/%Y %H:%M",
             errors="coerce",
         )
-        df_horarios = df_horarios[
-            df_horarios["_instante"].notna() & (df_horarios["_instante"] >= ahora)
-        ].sort_values("_instante")
-        for instante, franjas in df_horarios.groupby("_instante", sort=True):
-            aulas_disponibles = ", ".join(
-                f"Aula {fila['AULA']} sección {fila['SECCION']}"
-                for _, fila in franjas.iterrows()
-            )
-            lineas_horarios.append(f"{instante:%d/%m/%Y %H:%M}: {aulas_disponibles}")
-            if len(lineas_horarios) == 3:
-                break
+        df_cronograma = df_cronograma[df_cronograma["_instante"].notna()].copy()
+        df_cronograma["_fecha"] = df_cronograma["_instante"].dt.date
+        if numeros_aula or secciones or ubicaciones:
+            df_cronograma = df_cronograma[
+                df_cronograma["AULA"].add("|").add(df_cronograma["SECCION"]).isin(claves_relevantes)
+            ]
+        df_semana = df_cronograma[
+            df_cronograma["_fecha"].between(inicio_periodo, fin_periodo)
+        ].copy()
 
-    contexto = "Aulas:\n" + ("\n".join(lineas_aulas) or "No hay aulas que coincidan con la consulta.")
-    contexto += "\nPróximas franjas disponibles:\n"
-    contexto += "\n".join(lineas_horarios) or "No hay franjas disponibles en los datos."
-    return contexto, lineas_horarios
+        for (aula, seccion), franjas in df_semana.groupby(["AULA", "SECCION"], sort=True):
+            disponibles = franjas["SOLICITANTE"].str.strip().eq("").sum()
+            total = len(franjas)
+            estado = "sí" if disponibles else "no"
+            lineas_disponibilidad.append(
+                f"Aula {aula} sección {seccion}: disponibilidad {estado}, "
+                f"{disponibles} de {total} franjas de 30 minutos libres."
+            )
+
+        ocupadas = df_semana[df_semana["SOLICITANTE"].str.strip().ne("")].copy()
+        filtro_profesor = ""
+        profesor_explicito = re.search(
+            r"\b(?:profesor(?:a)?|docente)\s+(?:es\s+)?([^,;.!?]+)",
+            mensaje,
+            re.IGNORECASE,
+        )
+        if profesor_explicito:
+            filtro_profesor = re.split(
+                r"\b(?:esta|la\s+semana|semana|en|del|de|para|aula|el|las|los)\b",
+                profesor_explicito.group(1),
+                maxsplit=1,
+                flags=re.IGNORECASE,
+            )[0].strip()
+        if filtro_profesor:
+            coincide_profesor = (
+                ocupadas["SOLICITANTE"].str.contains(filtro_profesor, case=False, regex=False)
+                | ocupadas["CONTACTO"].str.contains(filtro_profesor, case=False, regex=False)
+            )
+            ocupadas = ocupadas[coincide_profesor]
+        if nombre_filtro:
+            coincide_nombre = (
+                ocupadas["SOLICITANTE"].str.contains(nombre_filtro, case=False, regex=False)
+                | ocupadas["CONTACTO"].str.contains(nombre_filtro, case=False, regex=False)
+            )
+            ocupadas = ocupadas[coincide_nombre]
+
+        descripciones = [
+            valor.strip()
+            for valor in df_cronograma["DESCRIPCION"].drop_duplicates()
+            if valor.strip() and valor.casefold() in mensaje_normalizado
+        ]
+        filtro_descripcion = max(descripciones, key=len) if descripciones else ""
+        if filtro_descripcion:
+            ocupadas = ocupadas[
+                ocupadas["DESCRIPCION"].str.contains(
+                    filtro_descripcion, case=False, regex=False
+                )
+            ]
+
+        claves_reserva = ["AULA", "SECCION", "_fecha", "SOLICITANTE", "DESCRIPCION"]
+        for clave, franjas in ocupadas.groupby(claves_reserva, sort=True, dropna=False):
+            aula, seccion, fecha, solicitante, descripcion = clave
+            instantes = sorted(franjas["_instante"].tolist())
+            inicio_bloque = fin_bloque = instantes[0]
+            bloques = []
+            for instante in instantes[1:]:
+                if instante == fin_bloque + timedelta(minutes=30):
+                    fin_bloque = instante
+                else:
+                    bloques.append((inicio_bloque, fin_bloque + timedelta(minutes=30)))
+                    inicio_bloque = fin_bloque = instante
+            bloques.append((inicio_bloque, fin_bloque + timedelta(minutes=30)))
+            for inicio, fin in bloques:
+                detalle = descripcion or "Reserva sin descripción"
+                lineas_reservas.append(
+                    f"Aula {aula} sección {seccion}, {fecha:%d/%m/%Y} "
+                    f"{inicio:%H:%M}-{fin:%H:%M}: {detalle}; "
+                    f"solicitante registrado: {solicitante}."
+                )
+
+    contexto = f"Periodo consultado: {inicio_periodo:%d/%m/%Y} a {fin_periodo:%d/%m/%Y}.\n"
+    contexto += "Aulas:\n" + ("\n".join(lineas_aulas) or "No hay aulas que coincidan con la consulta.")
+    contexto += "\nDisponibilidad semanal (cada franja equivale a 30 minutos):\n"
+    contexto += "\n".join(lineas_disponibilidad) or "No hay datos de disponibilidad para el periodo."
+    contexto += "\nReservas y clases coincidentes:\n"
+    contexto += "\n".join(lineas_reservas[:40]) or "No hay reservas que coincidan con los filtros."
+    if len(lineas_reservas) > 40:
+        contexto += f"\nSe omitieron {len(lineas_reservas) - 40} reservas adicionales."
+    return contexto, False
  
 def create_app():
     app = Flask(__name__)
@@ -444,11 +556,16 @@ def create_app():
 
         try:
             ruta_datos = Path(app.root_path)
-            contexto, _ = recuperar_contexto_asistente(
+            contexto, necesita_filtros = recuperar_contexto_asistente(
                 mensaje,
                 ruta_datos / NOMBRE_ARCHIVO,
                 ruta_datos / "cronograma.dat",
             )
+            if necesita_filtros:
+                return jsonify({
+                    "respuesta": "Para consultar el cronograma, indica al menos un filtro: "
+                                 "nombre o solicitante, fecha (DD/MM/AAAA) o número de aula."
+                })
             client = OpenAI(api_key=app.config["OPENAI_API_KEY"])
             respuesta = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -457,11 +574,15 @@ def create_app():
                     {
                         "role": "system",
                         "content": (
-                            "Responde en español y usa los datos recuperados para preguntas sobre aulas "
-                            "y disponibilidad. Sé conciso, con un máximo de 120 palabras. Si una respuesta "
-                            "completa sería extensa, resume lo esencial y termina con las tres franjas "
-                            "disponibles más próximas del contexto. No inventes datos ni horarios; si hay "
-                            "menos de tres franjas, menciona solo las existentes.\n\n"
+                            "Responde en español y usa el contexto recuperado como única fuente para "
+                            "preguntas sobre aulas, clases, reservas y disponibilidad. Sé conciso, con un "
+                            "máximo de 120 palabras; no inventes datos. El periodo del contexto indica "
+                            "la semana consultada y cada franja libre equivale a 30 minutos. Para preguntas "
+                            "sobre disponibilidad, indica las aulas con franjas libres según el resumen. "
+                            "Para clases o reservas, usa las fechas, horas, descripciones y aulas listadas. "
+                            "El cronograma no tiene una columna PROFESOR: SOLICITANTE y CONTACTO son los "
+                            "datos registrados, no afirmes que identifican al profesor salvo que el contexto "
+                            "lo confirme. Si no hay coincidencias, dilo claramente.\n\n"
                             f"{contexto}"
                         ),
                     },
